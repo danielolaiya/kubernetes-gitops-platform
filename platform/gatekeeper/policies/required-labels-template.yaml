@@ -1,0 +1,39 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: requiredlabels
+  annotations:
+    description: >
+      Enforces that all resources have the required labels.
+      Without these labels we basically have no idea who owns what
+      when something breaks at 2am.
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequiredLabels
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            labels:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package requiredlabels
+
+        violation[{"msg": msg}] {
+          # grab the labels from whatever resource is being admitted
+          provided := {label | input.review.object.metadata.labels[label]}
+          required := {label | label := input.parameters.labels[_]}
+
+          # find the ones that are missing
+          missing := required - provided
+
+          # if anything is missing, block it with a helpful message
+          count(missing) > 0
+          msg := sprintf("missing required labels: %v", [missing])
+        }

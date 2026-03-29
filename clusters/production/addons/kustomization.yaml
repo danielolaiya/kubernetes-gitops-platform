@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# this is basically the entry point for all cluster addons in production
+# argocd picks this up and syncs everything listed here automatically
+resources:
+  - argocd-app-gatekeeper.yaml
+  - argocd-app-sealed-secrets.yaml
+  - argocd-app-karpenter.yaml
+  - argocd-app-argo-rollouts.yaml

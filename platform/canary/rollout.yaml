@@ -1,0 +1,98 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: platform-api
+  namespace: production
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: platform-api
+  template:
+    metadata:
+      labels:
+        app: platform-api
+        team: platform
+        environment: production
+    spec:
+      containers:
+        - name: platform-api
+          image: platform-api:stable
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # basic health checks so the rollout knows when a canary pod is actually ready
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+  strategy:
+    canary:
+      # gradually shift traffic to the new version
+      # if SLOs breach at any step, argocd rolls back automatically
+      steps:
+        - setWeight: 10    # send 10% of traffic to canary first
+        - pause: {duration: 5m}
+        - setWeight: 25
+        - pause: {duration: 5m}
+        - setWeight: 50
+        - pause: {duration: 10m}
+        - setWeight: 75
+        - pause: {duration: 5m}
+        # if we get to here without issues, full rollout happens automatically
+
+      # hook into prometheus to check SLOs during the rollout
+      # if error rate goes above 1% or p99 latency spikes, roll back
+      analysis:
+        templates:
+          - templateName: slo-check
+        startingStep: 1
+        args:
+          - name: service-name
+            value: platform-api
+
+      canaryService: platform-api-canary
+      stableService: platform-api-stable
+
+      trafficRouting:
+        nginx:
+          stableIngress: platform-api-ingress
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-api-stable
+  namespace: production
+spec:
+  selector:
+    app: platform-api
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-api-canary
+  namespace: production
+spec:
+  selector:
+    app: platform-api
+  ports:
+    - port: 80
+      targetPort: 8080

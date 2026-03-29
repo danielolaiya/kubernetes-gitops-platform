@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gatekeeper
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://open-policy-agent.github.io/gatekeeper/charts
+    chart: gatekeeper
+    targetRevision: 3.14.0
+    helm:
+      values: |
+        replicas: 3
+        # audit runs every 60 seconds and checks existing resources
+        # against policies, not just new ones coming in
+        auditInterval: 60
+        constraintViolationsLimit: 20
+        logLevel: INFO
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gatekeeper-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

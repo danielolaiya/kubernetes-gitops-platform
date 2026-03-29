@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# staging gets the same addons as production
+# we test everything here first before it touches prod
+resources:
+  - argocd-app-gatekeeper.yaml
+  - argocd-app-sealed-secrets.yaml
+  - argocd-app-argo-rollouts.yaml
+  # karpenter not included in staging to keep costs down
+  # we just use managed node groups there

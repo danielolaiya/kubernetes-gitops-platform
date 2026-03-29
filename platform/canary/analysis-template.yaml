@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: slo-check
+  namespace: production
+spec:
+  args:
+    - name: service-name
+
+  metrics:
+    # check error rate every 2 minutes during the canary
+    # if it goes above 1% we fail the analysis and roll back
+    - name: error-rate
+      interval: 2m
+      # need 3 consecutive failures before rolling back
+      # one blip shouldnt kill a deployment
+      failureLimit: 3
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_requests_total{service="{{args.service-name}}",status=~"5.."}[2m]))
+            /
+            sum(rate(http_requests_total{service="{{args.service-name}}"}[2m]))
+      successCondition: result[0] < 0.01
+
+    # also check p99 latency, a deployment can have low errors but still be slow
+    - name: p99-latency
+      interval: 2m
+      failureLimit: 3
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.99,
+              sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[2m])) by (le)
+            )
+      # p99 should stay under 500ms, anything above that is a degradation
+      successCondition: result[0] < 0.5

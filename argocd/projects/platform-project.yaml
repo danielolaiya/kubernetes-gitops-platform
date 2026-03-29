@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Platform team project for cluster addons and infrastructure components
+
+  sourceRepos:
+    - https://github.com/danielolaiya/kubernetes-gitops-platform
+    - https://open-policy-agent.github.io/gatekeeper/charts
+    - https://bitnami-labs.github.io/sealed-secrets
+    - https://argoproj.github.io/argo-helm
+    - https://aws.github.io/eks-charts
+
+  destinations:
+    # platform team can deploy to any namespace, they own the cluster
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    # needs cluster-level access for things like CRDs and ClusterRoles
+    - group: "*"
+      kind: "*"
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  roles:
+    - name: platform-admin
+      description: Full access for the platform team
+      policies:
+        - p, proj:platform:platform-admin, applications, *, platform/*, allow
+      groups:
+        - platform-team
+
+    - name: readonly
+      description: Read only access for auditors
+      policies:
+        - p, proj:platform:readonly, applications, get, platform/*, allow

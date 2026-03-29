@@ -1,0 +1,25 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: RequiredLabels
+metadata:
+  name: require-team-labels
+spec:
+  # warn in staging, enforce hard in production
+  # this way teams get used to it before it starts blocking deployments
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    # skip kube-system and the platform namespaces themselves
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - argocd
+      - gatekeeper-system
+      - karpenter
+      - argo-rollouts
+  parameters:
+    labels:
+      - app
+      - team
+      - environment
